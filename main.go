@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"image/png"
 	"io"
@@ -16,9 +17,21 @@ import (
 	"github.com/gen2brain/go-fitz"
 )
 
-// Image is a simple struct to contain public url string
-type Image struct {
-	URL string
+// Block is a struct representation of a Slack message block
+type Block struct {
+	Type     string `json:"type"`
+	ImageURL string `json:"image_url"`
+	AltText  string `json:"alt_text"`
+}
+
+// Message is a struct representation of the Slack message payload
+type Message struct {
+	Blocks []Block `json:"blocks"`
+}
+
+// ImageHandler contains image metadata
+type ImageHandler struct {
+	ImageURL string
 }
 
 // downloadFile downloads the contents of a file and saves it to a specified location.
@@ -101,22 +114,32 @@ func objectURL(objAttrs *storage.ObjectAttrs) string {
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", objAttrs.Bucket, objAttrs.Name)
 }
 
-// func getMenu(w http.ResponseWriter, req *http.Request) {
-// 	image := Image{URL: ""}
-// }
+func (imageHandler ImageHandler) getMenu(w http.ResponseWriter, req *http.Request) {
+	block := Block{
+		Type:     "image",
+		ImageURL: "https://storage.googleapis.com/mother-kellys-beer/images/pdf200425",
+		AltText:  "Mother Kelly's Menu",
+	}
+	response := Message{
+		Blocks: []Block{block},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
+}
 
 func main() {
-	// const beerEndpoint = "https://motherkellys.co.uk/wp-content/menu/Menu_SE1.pdf"
+	const pdfEndpoint = "https://motherkellys.co.uk/wp-content/menu/Menu_N16.pdf"
 	const downloadDest = "/tmp/beer.pdf"
-	const beerPdf = "/Users/jakeburn/Documents/Repos/github_personal/get-beer/resources/beer_190721.pdf"
 	const projectID = "beer-274619"
 	const bucket = "mother-kellys-beer"
-	var name = "images/beer-" + time.Now().Format("060102")
+	var name = "images/pdf" + time.Now().Format("060102")
 	ctx := context.Background()
 
-	// f := downloadFile(beerEndpoint, downloadDest)
+	f := downloadFile(pdfEndpoint, downloadDest)
 
-	pdf, err := fitz.New(beerPdf)
+	pdf, err := fitz.New(f)
 	if err != nil {
 		panic(err)
 	}
@@ -136,14 +159,7 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(objectURL(attr))
-
-	// for n := 0; n < doc.NumPage(); n++ {
-	// 	text, err := doc.Text(n)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	fmt.Println(text)
-	// }
-
+	imageHandler := ImageHandler{ImageURL: objectURL(attr)}
+	http.HandleFunc("/beer", imageHandler.getMenu)
+	http.ListenAndServe(":8090", nil)
 }
