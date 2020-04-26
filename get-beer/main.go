@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"image/png"
@@ -14,6 +13,10 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/gen2brain/go-fitz"
 )
 
@@ -78,36 +81,33 @@ func getImage(pdf *fitz.Document) (*bytes.Buffer, error) {
 	return buff, nil
 }
 
-// upload uploads a file to a GCS bucket
-func upload(ctx context.Context, r io.Reader, projectID, bucket, name string, public bool) (*storage.ObjectHandle, *storage.ObjectAttrs, error) {
-	client, err := storage.NewClient(ctx)
+// upload uploads a file to an S3 bucket and returns its location
+func upload(r io.Reader, region string, profile string, bucket string, key string) (string, error) {
+	// Create session
+	// sess, err := session.NewSessionWithOptions(session.Options{
+	// 	Profile: profile,
+	// })
+	sess, err := session.NewSession(&aws.Config{
+		Region:      aws.String(region),
+		Credentials: credentials.NewSharedCredentials("", profile),
+	})
 	if err != nil {
-		return nil, nil, err
+		return "", err
 	}
 
-	bh := client.Bucket(bucket)
-	// Next check if the bucket exists
-	if _, err = bh.Attrs(ctx); err != nil {
-		return nil, nil, err
+	uploader := s3manager.NewUploader(sess)
+
+	// Upload the file to S3.
+	result, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+		Body:   r,
+	})
+	if err != nil {
+		return "", err
 	}
 
-	obj := bh.Object(name)
-	w := obj.NewWriter(ctx)
-	if _, err := io.Copy(w, r); err != nil {
-		return nil, nil, err
-	}
-	if err := w.Close(); err != nil {
-		return nil, nil, err
-	}
-
-	if public {
-		if err := obj.ACL().Set(ctx, storage.AllUsers, storage.RoleReader); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	attrs, err := obj.Attrs(ctx)
-	return obj, attrs, err
+	return result.Location, nil
 }
 
 func objectURL(objAttrs *storage.ObjectAttrs) string {
@@ -117,7 +117,7 @@ func objectURL(objAttrs *storage.ObjectAttrs) string {
 func (imageHandler ImageHandler) getMenu(w http.ResponseWriter, req *http.Request) {
 	block := Block{
 		Type:     "image",
-		ImageURL: "https://storage.googleapis.com/mother-kellys-beer/images/pdf200425",
+		ImageURL: imageHandler.ImageURL,
 		AltText:  "Mother Kelly's Menu",
 	}
 	response := Message{
@@ -132,10 +132,10 @@ func (imageHandler ImageHandler) getMenu(w http.ResponseWriter, req *http.Reques
 func main() {
 	const pdfEndpoint = "https://motherkellys.co.uk/wp-content/menu/Menu_N16.pdf"
 	const downloadDest = "/tmp/beer.pdf"
-	const projectID = "beer-274619"
-	const bucket = "mother-kellys-beer"
-	var name = "images/pdf" + time.Now().Format("060102")
-	ctx := context.Background()
+	const awsRegion = "eu-west-1"
+	const awsProfile = "personal"
+	const bucket = "mother-kellys"
+	var name = fmt.Sprintf("images/stokenewington/pdf-%s.png", time.Now().Format("060102"))
 
 	f := downloadFile(pdfEndpoint, downloadDest)
 
@@ -154,12 +154,12 @@ func main() {
 		panic(err)
 	}
 
-	_, attr, err := upload(ctx, png, projectID, bucket, name, true)
+	location, err := upload(png, awsRegion, awsProfile, bucket, name)
 	if err != nil {
 		panic(err)
 	}
 
-	imageHandler := ImageHandler{ImageURL: objectURL(attr)}
+	imageHandler := ImageHandler{ImageURL: location}
 	http.HandleFunc("/beer", imageHandler.getMenu)
 	http.ListenAndServe(":8090", nil)
 }
