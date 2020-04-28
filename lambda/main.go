@@ -2,15 +2,19 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
+	"os"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
+
+var errorLogger = log.New(os.Stderr, "ERROR ", log.Llongfile)
 
 // Block is a struct representation of a Slack message block
 type Block struct {
@@ -29,24 +33,11 @@ type PublicURL struct {
 	PublicURL string `json:"public_url" dynamodbav:"public_url"`
 }
 
-func (publicURL PublicURL) getMenu(w http.ResponseWriter, req *http.Request) {
-	block := Block{
-		Type:     "image",
-		ImageURL: publicURL.PublicURL,
-		AltText:  "Mother Kelly's Menu",
-	}
-	response := Message{
-		Blocks: []Block{block},
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
-}
-
-func getLatestImage(sess *session.Session, table string) (PublicURL, error) {
-	var publicURL []PublicURL
-	svc := dynamodb.New(sess)
+func getLatestImage(table string, region string) (PublicURL, error) {
+	var queryResponse []PublicURL
+	// Empty struct required so that there is always a valid variable to return during error handling
+	var publicURL PublicURL
+	svc := dynamodb.New(session.New(), aws.NewConfig().WithRegion(region))
 	result, err := svc.Query(&dynamodb.QueryInput{
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":v1": {
@@ -60,42 +51,50 @@ func getLatestImage(sess *session.Session, table string) (PublicURL, error) {
 		TableName:              aws.String(table),
 	})
 	if err != nil {
-		return publicURL[0], err
+		return publicURL, err
 	}
 
-	err = dynamodbattribute.UnmarshalListOfMaps(result.Items, &publicURL)
+	err = dynamodbattribute.UnmarshalListOfMaps(result.Items, &queryResponse)
 	if err != nil {
-		return publicURL[0], err
+		return publicURL, err
 	}
 
-	return publicURL[0], nil
+	return queryResponse[0], nil
 }
 
-func lambdaHandler() (PublicURL, error) {
+func httpError(status int) events.APIGatewayProxyResponse {
+	return events.APIGatewayProxyResponse{
+		StatusCode: status,
+		Body:       http.StatusText(status),
+	}
+}
+
+func lambdaHandler(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	const awsRegion = "eu-west-1"
-	const awsProfile = "personal"
 	const dynamoDBTable = "MotherKellysMenus"
 	const barLocation = "stokenewington"
 	var latestImage PublicURL
 
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(awsRegion),
-		Credentials: credentials.NewSharedCredentials("", awsProfile),
-	})
+	latestImage, err := getLatestImage(dynamoDBTable, awsRegion)
 	if err != nil {
-		return latestImage, err
+		errorLogger.Println(err.Error())
+		return httpError(http.StatusInternalServerError), nil
+	}
+	if latestImage.PublicURL == "" {
+		return httpError(http.StatusNotFound), nil
 	}
 
-	latestImage, err = getLatestImage(sess, dynamoDBTable)
+	latestImageJSON, err := json.Marshal(latestImage)
 	if err != nil {
-		return latestImage, err
+		errorLogger.Println(err.Error())
+		return httpError(http.StatusInternalServerError), nil
 	}
 
-	return latestImage, nil
-
-	// publicURL := PublicURL{PublicURL: latestImage.PublicURL}
-	// http.HandleFunc("/beer", publicURL.getMenu)
-	// http.ListenAndServe(":8090", nil)
+	// All good if we got to here!
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Body:       string(latestImageJSON),
+	}, nil
 }
 
 func main() {
