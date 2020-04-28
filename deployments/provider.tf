@@ -6,7 +6,7 @@ provider "aws" {
 
 terraform {
   backend "gcs" {
-    bucket  = "tf_state_jake_personal"
-    prefix  = "terraform/state/get-beer"
+    bucket = "tf_state_jake_personal"
+    prefix = "terraform/state/get-beer"
   }
 }

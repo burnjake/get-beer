@@ -17,7 +17,32 @@ resource "aws_iam_role" "lambda-role" {
 EOF
 }
 
-resource "aws_iam_role_policy_attachment" "eks-cluster-policy" {
+data "aws_iam_policy_document" "dynamodb-read-policy-document" {
+  statement {
+    sid = "1"
+
+    actions = [
+      "dynamodb:Query"
+    ]
+
+    resources = [
+      aws_dynamodb_table.mother-kellys.arn,
+    ]
+  }
+}
+
+resource "aws_iam_policy" "dynamodb-read" {
+  name   = "dynamodb-read"
+  policy = data.aws_iam_policy_document.dynamodb-read-policy-document.json
+}
+
+resource "aws_iam_role_policy_attachment" "dynamo-read-policy-attachment" {
+  role       = aws_iam_role.lambda-role.name
+  policy_arn = aws_iam_policy.dynamodb-read.arn
+}
+
+
+resource "aws_iam_role_policy_attachment" "lambda-basic-policy-attachment" {
   role       = aws_iam_role.lambda-role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
