@@ -69,6 +69,33 @@ func httpError(status int) events.APIGatewayProxyResponse {
 	}
 }
 
+func constructResponse(url string) (events.APIGatewayProxyResponse, error) {
+	block := Block{
+		Type:     "image",
+		ImageURL: url,
+		AltText:  "Mother Kelly's Menu",
+	}
+
+	message := Message{
+		Blocks: []Block{block},
+	}
+
+	responseBody, err := json.Marshal(message)
+	if err != nil {
+		errorLogger.Println(err.Error())
+		return httpError(http.StatusInternalServerError), nil
+	}
+
+	// All good if we got to here!
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Body:       string(responseBody),
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+		},
+	}, nil
+}
+
 func lambdaHandler(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	const awsRegion = "eu-west-1"
 	const dynamoDBTable = "MotherKellysMenus"
@@ -84,17 +111,13 @@ func lambdaHandler(events.APIGatewayProxyRequest) (events.APIGatewayProxyRespons
 		return httpError(http.StatusNotFound), nil
 	}
 
-	latestImageJSON, err := json.Marshal(latestImage)
+	response, err := constructResponse(latestImage.PublicURL)
 	if err != nil {
 		errorLogger.Println(err.Error())
 		return httpError(http.StatusInternalServerError), nil
 	}
 
-	// All good if we got to here!
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Body:       string(latestImageJSON),
-	}, nil
+	return response, nil
 }
 
 func main() {

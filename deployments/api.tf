@@ -25,7 +25,8 @@ resource "aws_api_gateway_integration" "mother-kellys" {
 }
 
 resource "aws_api_gateway_deployment" "mother-kellys" {
-  depends_on = [aws_api_gateway_integration.mother-kellys]
   rest_api_id = aws_api_gateway_rest_api.mother-kellys.id
   stage_name  = "mk"
+
+  depends_on = [aws_api_gateway_integration.mother-kellys]
 }
