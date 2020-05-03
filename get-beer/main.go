@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/gen2brain/go-fitz"
+	"github.com/joho/godotenv"
 )
 
 // ImageMetadata contains image metadata
@@ -98,14 +99,26 @@ func saveImageMetadata(sess *session.Session, table string, record ImageMetadata
 	return nil
 }
 
+func init() {
+	if err := godotenv.Load(); err != nil {
+		panic(err)
+	}
+}
+
 func main() {
-	const pdfEndpoint = "https://motherkellys.co.uk/wp-content/menu/Menu_N16.pdf"
-	const downloadDest = "/tmp/beer.pdf"
-	const awsRegion = "eu-west-1"
-	const awsProfile = "personal"
-	const bucket = "mother-kellys"
-	const dynamoDBTable = "MotherKellysMenus"
-	const barLocation = "stokenewington"
+	// const pdfEndpoint = "https://motherkellys.co.uk/wp-content/menu/Menu_N16.pdf"
+	// const downloadDest = "/tmp/beer.pdf"
+	// const awsRegion = "eu-west-1"
+	// const awsProfile = "personal"
+	// const bucket = "mother-kellys"
+	// const dynamoDBTable = "MotherKellysMenus"
+	// const barLocation = "stokenewington"
+	var pdfEndpoint = os.Getenv("ENDPOINT")
+	var downloadDest = os.Getenv("DOWNLOAD_DEST")
+	var awsRegion = os.Getenv("AWS_REGION")
+	var bucket = os.Getenv("S3_BUCKET")
+	var dynamoDBTable = os.Getenv("DYNAMODB_TABLE")
+	var barLocation = os.Getenv("BAR_LOCATION")
 	var date = time.Now().Format("06-01-02")
 	var name = fmt.Sprintf("images/%s/pdf-%s.png", barLocation, date)
 
@@ -125,6 +138,7 @@ func main() {
 		Region:      aws.String(awsRegion),
 		Credentials: credentials.NewSharedCredentials("", awsProfile),
 	})
+	// sess := session.New()
 	if err != nil {
 		panic(err)
 	}
