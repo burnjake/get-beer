@@ -8,8 +8,6 @@ resource "aws_iam_access_key" "get-beer" {
 
 data "aws_iam_policy_document" "s3-put" {
   statement {
-    sid = "1"
-
     actions = [
       "s3:PutObject"
     ]
@@ -32,8 +30,6 @@ resource "aws_iam_user_policy_attachment" "attach-s3" {
 
 data "aws_iam_policy_document" "dynamo-put" {
   statement {
-    sid = "1"
-
     actions = [
       "dynamodb:PutItem"
     ]

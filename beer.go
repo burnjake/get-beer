@@ -1,4 +1,4 @@
-package main
+package beer
 
 import (
 	"bytes"
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
@@ -115,7 +114,7 @@ func main() {
 	// const barLocation = "stokenewington"
 	var pdfEndpoint = os.Getenv("ENDPOINT")
 	var downloadDest = os.Getenv("DOWNLOAD_DEST")
-	var awsRegion = os.Getenv("AWS_REGION")
+	// var awsRegion = os.Getenv("AWS_REGION")
 	var bucket = os.Getenv("S3_BUCKET")
 	var dynamoDBTable = os.Getenv("DYNAMODB_TABLE")
 	var barLocation = os.Getenv("BAR_LOCATION")
@@ -134,11 +133,10 @@ func main() {
 		panic(err)
 	}
 
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(awsRegion),
-		Credentials: credentials.NewSharedCredentials("", awsProfile),
-	})
-	// sess := session.New()
+	// sess, err := session.NewSession(&aws.Config{
+	// 	Region: aws.String(awsRegion),
+	// })
+	sess, err := session.NewSession()
 	if err != nil {
 		panic(err)
 	}
