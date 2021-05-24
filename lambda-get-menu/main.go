@@ -45,7 +45,7 @@ func getLatestImage(table string, region string, hashKeyVal string) (PublicURL, 
 	result, err := svc.Query(&dynamodb.QueryInput{
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":v1": {
-				S: aws.String(hashKey),
+				S: aws.String(hashKeyVal),
 			},
 		},
 		KeyConditionExpression: aws.String("bar_location = :v1"),
