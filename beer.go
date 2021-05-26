@@ -1,4 +1,4 @@
-package beer
+package main
 
 import (
 	"bytes"

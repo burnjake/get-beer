@@ -41,7 +41,8 @@ func getLatestImage(table string, region string, hashKeyVal string) (PublicURL, 
 	var queryResponse []PublicURL
 	// Empty struct required so that there is always a valid variable to return when error handling
 	var publicURL PublicURL
-	svc := dynamodb.New(session.New(), aws.NewConfig().WithRegion(region))
+
+	svc := dynamodb.New(session.Must(session.NewSession()))
 	result, err := svc.Query(&dynamodb.QueryInput{
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":v1": {
