@@ -42,8 +42,8 @@ func getLatestImage(table string, region string, hashKeyVal string) (PublicURL, 
 	// Empty struct required so that there is always a valid variable to return when error handling
 	var publicURL PublicURL
 
-	svc := dynamodb.New(session.Must(session.NewSession()))
-	result, err := svc.Query(&dynamodb.QueryInput{
+	client := dynamodb.New(session.Must(session.NewSession()))
+	result, err := client.Query(&dynamodb.QueryInput{
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":v1": {
 				S: aws.String(hashKeyVal),
@@ -103,18 +103,16 @@ func constructResponse(url string) (events.APIGatewayProxyResponse, error) {
 }
 
 func lambdaHandler(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	var latestImage PublicURL
-
-	latestImage, err := getLatestImage(dynamoDBTable, awsRegion, hashKey)
+	latestImageURL, err := getLatestImage(dynamoDBTable, awsRegion, hashKey)
 	if err != nil {
 		errorLogger.Println(err.Error())
 		return httpError(http.StatusInternalServerError), nil
 	}
-	if latestImage.PublicURL == "" {
+	if latestImageURL.PublicURL == "" {
 		return httpError(http.StatusNotFound), nil
 	}
 
-	response, err := constructResponse(latestImage.PublicURL)
+	response, err := constructResponse(latestImageURL.PublicURL)
 	if err != nil {
 		errorLogger.Println(err.Error())
 		return httpError(http.StatusInternalServerError), nil

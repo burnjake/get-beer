@@ -39,7 +39,11 @@ func downloadFile(url string, dest string) string {
 		log.Fatal(err)
 	}
 	defer f.Close()
-	io.Copy(f, resp.Body)
+
+	_, err = io.Copy(f, resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return f.Name()
 }
