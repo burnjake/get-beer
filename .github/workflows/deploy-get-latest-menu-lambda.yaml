@@ -1,0 +1,31 @@
+name: deploy_get_latest_menu_lambda
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "lambda/get-latest-menu"
+jobs:
+  deploy_lambda:
+    name: deploy_lambda
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout source code
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.16.2"
+      - name: Build binary
+        run: |
+          cd lambda/get-latest-menu &&
+          GOOS=linux GOARCH=amd64 go build -v -a -o main main.go &&
+          zip lambda.zip main
+      - name: Update lambda
+        uses: appleboy/lambda-action@master
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: ${{ secrets.AWS_REGION }}
+          function_name: get_latest_menu
+          zip_file: lambda/get-latest-menu/lambda.zip
