@@ -2,3 +2,5 @@
 resources
 *.tfvars
 *.terraform
+scripts
+credentials

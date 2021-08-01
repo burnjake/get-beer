@@ -1,0 +1,17 @@
+name: terraform_apply
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - deployments
+jobs:
+  terraform_apply:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: hashicorp/setup-terraform@v1
+    - name: Terraform Apply
+      id: apply
+      run: terraform apply -no-color -auto-approve

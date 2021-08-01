@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/gen2brain/go-fitz"
+	"github.com/joho/godotenv"
 )
 
 // ImageMetadata contains image metadata
@@ -39,7 +39,11 @@ func downloadFile(url string, dest string) string {
 		log.Fatal(err)
 	}
 	defer f.Close()
-	io.Copy(f, resp.Body)
+
+	_, err = io.Copy(f, resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return f.Name()
 }
@@ -98,14 +102,26 @@ func saveImageMetadata(sess *session.Session, table string, record ImageMetadata
 	return nil
 }
 
+func init() {
+	if err := godotenv.Load(); err != nil {
+		panic(err)
+	}
+}
+
 func main() {
-	const pdfEndpoint = "https://motherkellys.co.uk/wp-content/menu/Menu_N16.pdf"
-	const downloadDest = "/tmp/beer.pdf"
-	const awsRegion = "eu-west-1"
-	const awsProfile = "personal"
-	const bucket = "mother-kellys"
-	const dynamoDBTable = "MotherKellysMenus"
-	const barLocation = "stokenewington"
+	// const pdfEndpoint = "https://motherkellys.co.uk/wp-content/menu/Menu_N16.pdf"
+	// const downloadDest = "/tmp/beer.pdf"
+	// const awsRegion = "eu-west-1"
+	// const awsProfile = "personal"
+	// const bucket = "mother-kellys"
+	// const dynamoDBTable = "MotherKellysMenus"
+	// const barLocation = "stokenewington"
+	var pdfEndpoint = os.Getenv("ENDPOINT")
+	var downloadDest = os.Getenv("DOWNLOAD_DEST")
+	// var awsRegion = os.Getenv("AWS_REGION")
+	var bucket = os.Getenv("S3_BUCKET")
+	var dynamoDBTable = os.Getenv("DYNAMODB_TABLE")
+	var barLocation = os.Getenv("BAR_LOCATION")
 	var date = time.Now().Format("06-01-02")
 	var name = fmt.Sprintf("images/%s/pdf-%s.png", barLocation, date)
 
@@ -121,10 +137,10 @@ func main() {
 		panic(err)
 	}
 
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(awsRegion),
-		Credentials: credentials.NewSharedCredentials("", awsProfile),
-	})
+	// sess, err := session.NewSession(&aws.Config{
+	// 	Region: aws.String(awsRegion),
+	// })
+	sess, err := session.NewSession()
 	if err != nil {
 		panic(err)
 	}

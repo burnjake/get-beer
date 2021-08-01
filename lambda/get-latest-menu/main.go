@@ -15,6 +15,9 @@ import (
 )
 
 var errorLogger = log.New(os.Stderr, "ERROR ", log.Llongfile)
+var awsRegion string
+var dynamoDBTable string
+var hashKey string
 
 // Block is a struct representation of a Slack message block
 type Block struct {
@@ -25,7 +28,8 @@ type Block struct {
 
 // Message is a struct representation of the Slack message payload
 type Message struct {
-	Blocks []Block `json:"blocks"`
+	ResonseType string  `json:"response_type"`
+	Blocks      []Block `json:"blocks"`
 }
 
 // PublicURL contains the public URL of an object
@@ -33,15 +37,16 @@ type PublicURL struct {
 	PublicURL string `json:"public_url" dynamodbav:"public_url"`
 }
 
-func getLatestImage(table string, region string) (PublicURL, error) {
+func getLatestImage(table string, region string, hashKeyVal string) (PublicURL, error) {
 	var queryResponse []PublicURL
-	// Empty struct required so that there is always a valid variable to return during error handling
+	// Empty struct required so that there is always a valid variable to return when error handling
 	var publicURL PublicURL
-	svc := dynamodb.New(session.New(), aws.NewConfig().WithRegion(region))
-	result, err := svc.Query(&dynamodb.QueryInput{
+
+	client := dynamodb.New(session.Must(session.NewSession()))
+	result, err := client.Query(&dynamodb.QueryInput{
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":v1": {
-				S: aws.String("stokenewington"),
+				S: aws.String(hashKeyVal),
 			},
 		},
 		KeyConditionExpression: aws.String("bar_location = :v1"),
@@ -77,7 +82,8 @@ func constructResponse(url string) (events.APIGatewayProxyResponse, error) {
 	}
 
 	message := Message{
-		Blocks: []Block{block},
+		ResonseType: "in_channel",
+		Blocks:      []Block{block},
 	}
 
 	responseBody, err := json.Marshal(message)
@@ -97,21 +103,16 @@ func constructResponse(url string) (events.APIGatewayProxyResponse, error) {
 }
 
 func lambdaHandler(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	const awsRegion = "eu-west-1"
-	const dynamoDBTable = "MotherKellysMenus"
-	const barLocation = "stokenewington"
-	var latestImage PublicURL
-
-	latestImage, err := getLatestImage(dynamoDBTable, awsRegion)
+	latestImageURL, err := getLatestImage(dynamoDBTable, awsRegion, hashKey)
 	if err != nil {
 		errorLogger.Println(err.Error())
 		return httpError(http.StatusInternalServerError), nil
 	}
-	if latestImage.PublicURL == "" {
+	if latestImageURL.PublicURL == "" {
 		return httpError(http.StatusNotFound), nil
 	}
 
-	response, err := constructResponse(latestImage.PublicURL)
+	response, err := constructResponse(latestImageURL.PublicURL)
 	if err != nil {
 		errorLogger.Println(err.Error())
 		return httpError(http.StatusInternalServerError), nil
